@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        id: cache-toolchain
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/bin
+          key: xtensa-toolchain-v1.5-espflash
+
+      - if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          default: true
+          ldproxy: false
+
+      - if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: cargo install espflash
+
+      - if: steps.cache-toolchain.outputs.cache-hit == 'true'
+        run: rustup default esp
+
+      - run: chmod +x build-all-examples.sh cargo_elf_to_esptool.sh
+
+      - run: ./build-all-examples.sh
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: target/binaries/*.bin
+          generate_release_notes: true
