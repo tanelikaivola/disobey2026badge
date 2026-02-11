@@ -2,7 +2,7 @@
 edition = "2024"
 name = "disobey2026badge"
 rust-version = "1.91"
-version = "0.1.0"
+version = "0.1.1"
 description = "Hardware support library for the Disobey 2026 badge (ESP32-S3)"
 license = "MIT"
 repository = "https://github.com/tanelikaivola/disobey2026badge"
