@@ -1,0 +1,49 @@
+[package]
+edition = "2024"
+name = "disobey2026badge"
+rust-version = "1.91"
+version = "0.1.0"
+description = "Hardware support library for the Disobey 2026 badge (ESP32-S3)"
+
+[dependencies]
+esp-hal = { version = "1.0.0", features = ["defmt", "esp32s3", "unstable"] }
+esp-rtos = { version = "0.2.0", features = ["defmt", "embassy", "esp-alloc", "esp32s3"] }
+
+defmt = "1.0.1"
+esp-bootloader-esp-idf = { version = "0.4.0", features = ["defmt", "esp32s3"] }
+
+embedded-hal = "1.0"
+embedded-hal-async = "1.0"
+embedded-hal-bus = "0.3.0"
+esp-alloc = { version = "0.9.0", features = ["defmt"] }
+esp-backtrace = { version = "0.18.1", features = ["defmt", "esp32s3", "panic-handler"] }
+esp-println = { version = "0.16.1", features = ["defmt-espflash", "esp32s3"] }
+
+embassy-executor = { version = "0.9.1", features = ["defmt"] }
+embassy-time = { version = "0.5.0", features = ["defmt"] }
+embassy-futures = { version = "0.1.2", features = ["defmt"] }
+
+embedded-graphics = { version = "0.8.1", features = ["defmt"] }
+mipidsi = "0.9.0"
+fugit = { version = "0.3.9", features = ["defmt"] }
+
+palette = { version = "0.7.6", default-features = false, features = [
+  "alloc", "approx", "named", "named_from_str", "phf", "libm",
+] }
+
+critical-section = "1.2.0"
+static_cell = "2.1.1"
+embassy-sync = { version = "0.7.2", default-features = false, features = ["defmt"] }
+
+[profile.dev]
+opt-level = "s"
+
+[profile.release]
+codegen-units = 1
+debug = false
+debug-assertions = false
+incremental = false
+lto = true
+opt-level = 's'
+overflow-checks = false
+strip = "debuginfo"
