@@ -6,18 +6,34 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      - uses: actions/cache@v4
+        id: cache-toolchain
+        with:
+          path: |
+            ~/.rustup
+            ~/.cargo/bin
+          key: xtensa-toolchain-v1.5-espflash
+
+      - if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        uses: esp-rs/xtensa-toolchain@v1.5
         with:
           default: true
           ldproxy: false
 
-      - run: cargo binstall espflash
+      - if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: cargo install espflash
+
+      - if: steps.cache-toolchain.outputs.cache-hit == 'true'
+        run: rustup default esp
 
       - run: chmod +x build-all-examples.sh cargo_elf_to_esptool.sh
 
