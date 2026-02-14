@@ -2,14 +2,15 @@
 //!
 //! Set the name at compile time via the `NAME` environment variable.
 //! Optionally set `BG` and `FG` as 6-char hex RGB colors (or `BG="rainbow"`
-//! for an animated hue-cycling background, or `BG="retrofuture"` for an
-//! animated synthwave road with a setting sun), and `LEDS=heartbeat` or
-//! `LEDS=rainbow` for LED effects.
+//! for an animated hue-cycling background, `BG="retrofuture"` for an
+//! animated synthwave road with a setting sun, or `BG="hearts"` for
+//! floating hearts), and `LEDS=heartbeat` or `LEDS=rainbow` for LED effects.
 //!
 //! ```sh
 //! NAME="User" BG="rainbow" FG="E0E0E0" LEDS="heartbeat" cargo run --release --example nametag
 //! NAME="Admin" BG="retrofuture" FG="E0E0E0" LEDS="rainbow" cargo run --release --example nametag
 //! NAME="Speaker" cargo run --release --example nametag
+//! NAME="Love" BG="hearts" FG="FFE0E0" LEDS="heartbeat" cargo run --release --example nametag
 //! ```
 
 #![no_std]
@@ -98,12 +99,18 @@ const BG_RETROFUTURE: bool = match BG_STR {
     None => false,
 };
 
+const BG_HEARTS: bool = match BG_STR {
+    Some(s) => str_eq(s, "hearts"),
+    None => false,
+};
+
 const BG_COLOR: Rgb565 = match BG_STR {
     Some(s) if BG_RAINBOW => Rgb565::BLACK,
     Some(s) if BG_RETROFUTURE => Rgb565::BLACK,
+    Some(s) if BG_HEARTS => Rgb565::BLACK,
     Some(s) => match parse_hex_rgb565(s) {
         Some(c) => c,
-        None => panic!("BG must be a 6-char hex RGB string, \"rainbow\", or \"retrofuture\""),
+        None => panic!("BG must be a 6-char hex RGB string, \"rainbow\", \"retrofuture\", or \"hearts\""),
     },
     None => Rgb565::new(2, 8, 20),
 };
@@ -432,6 +439,123 @@ fn sqrt_approx(x: f32) -> f32 {
     guess
 }
 
+/// Simple pseudo-random hash for deterministic heart placement.
+fn hash_u32(mut x: u32) -> u32 {
+    x = x.wrapping_mul(2654435761);
+    x ^= x >> 16;
+    x = x.wrapping_mul(2246822519);
+    x ^= x >> 13;
+    x
+}
+
+/// Test if point (px, py) is inside a heart shape, normalized to ~[-1.3, 1.3].
+/// Uses the implicit curve: (x² + y² - 1)³ - x²·y³ < 0
+/// Returns a value < 0 inside, > 0 outside (usable as approximate distance).
+fn heart_sdf(px: f32, py: f32) -> f32 {
+    let x = px;
+    let y = py; // positive y = top (lobes), negative y = bottom (point)
+    let x2 = x * x;
+    let y2 = y * y;
+    let y3 = y2 * y;
+    let a = x2 + y2 - 1.0;
+    a * a * a - x2 * y3
+}
+
+/// Number of floating hearts scattered across the background.
+const NUM_HEARTS: u32 = 10;
+
+/// Compute the color for a hearts-background pixel at (px, py) for the given frame.
+fn hearts_pixel(px: i32, py: i32, frame: u32) -> Rgb565 {
+    let fx = px as f32;
+    let fy = py as f32;
+
+    // Dark background with a subtle gradient
+    let bg_r = 5.0 + (fy / H as f32) * 15.0;
+    let bg_g = 0.0;
+    let bg_b = 15.0 + (fy / H as f32) * 20.0;
+
+    let mut r = bg_r;
+    let mut g = bg_g;
+    let mut b = bg_b;
+
+    for i in 0..NUM_HEARTS {
+        let seed = hash_u32(i * 7 + 31);
+        // Each heart has a fixed x column, a size, and a speed
+        let hx = (seed % W) as f32;
+        let size = 30.0 + (hash_u32(seed + 3) % 25) as f32;
+        let speed = 1.0 + (hash_u32(seed + 7) % 10) as f32 * 0.3;
+        let phase = (hash_u32(seed + 13) % 1000) as f32;
+
+        // Float upward: y decreases over time, wrapping around
+        let total_h = H as f32 + size * 2.0;
+        let raw_y = phase + frame as f32 * speed;
+        // Heart moves from bottom to top
+        let hy = H as f32 + size - (raw_y % total_h);
+
+        // Gentle horizontal wobble using triangle wave (no sin needed)
+        let wobble_period = 200.0;
+        let wobble_phase = raw_y % wobble_period;
+        let wobble = if wobble_phase < wobble_period * 0.5 {
+            (wobble_phase / (wobble_period * 0.5)) * 2.0 - 1.0
+        } else {
+            1.0 - ((wobble_phase - wobble_period * 0.5) / (wobble_period * 0.5)) * 2.0
+        } * 12.0;
+        let cx = hx + wobble;
+
+        // Transform pixel into heart-local coords, normalized to ~[-1.3,1.3]
+        // Flip y so lobes are on top, point is at bottom
+        let lx = (fx - cx) / size;
+        let ly = -(fy - hy) / size;
+
+        let dist = heart_sdf(lx, ly);
+
+        if dist < 0.0 {
+            // Inside the heart — pick a pink/red hue per heart
+            let hue_offset = (hash_u32(seed + 19) % 40) as f32; // 0..40
+            let hr = 200.0 + hue_offset;
+            let hg = 20.0 + hue_offset * 0.5;
+            let hb = 60.0 + hue_offset * 1.5;
+            // Slight brightness variation toward edges
+            let edge = 1.0 + dist * 1.5; // dist is negative inside, so edge < 1 at edges
+            r = hr * edge;
+            g = hg * edge;
+            b = hb * edge;
+        } else if dist < 0.15 {
+            // Soft glow around heart
+            let glow = 1.0 - dist / 0.15;
+            let glow = glow * glow * 0.3;
+            r += 180.0 * glow;
+            g += 20.0 * glow;
+            b += 60.0 * glow;
+        }
+    }
+
+    // Clamp
+    if r > 255.0 { r = 255.0; }
+    if g > 255.0 { g = 255.0; }
+    if b > 255.0 { b = 255.0; }
+
+    Rgb565::new(r as u8 >> 3, g as u8 >> 2, b as u8 >> 3)
+}
+
+/// Draw the hearts animated frame.
+fn draw_hearts_frame(display: &mut Display, frame: u32, layout: &NameLayout) {
+    let area = Rectangle::new(Point::zero(), Size::new(W, H));
+    let pixels = (0u32..(W * H)).map(|i| {
+        let px = (i % W) as i32;
+        let py = (i / W) as i32;
+        if layout.is_fg(px, py) {
+            FG_COLOR
+        } else if is_label_pixel(px, py) {
+            LABEL_COLOR
+        } else {
+            hearts_pixel(px, py, frame)
+        }
+    });
+    display.fill_contiguous(&area, pixels).unwrap();
+}
+
+
 /// Draw the retrofuture animated frame.
 fn draw_retrofuture_frame(display: &mut Display, frame: u32, layout: &NameLayout) {
     let area = Rectangle::new(Point::zero(), Size::new(W, H));
@@ -488,6 +612,13 @@ async fn display_task(
         let mut frame = 0u32;
         loop {
             draw_retrofuture_frame(display, frame, &layout);
+            frame = frame.wrapping_add(1);
+            Timer::after(Duration::from_millis(50)).await;
+        }
+    } else if BG_HEARTS {
+        let mut frame = 0u32;
+        loop {
+            draw_hearts_frame(display, frame, &layout);
             frame = frame.wrapping_add(1);
             Timer::after(Duration::from_millis(50)).await;
         }

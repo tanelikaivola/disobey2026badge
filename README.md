@@ -65,7 +65,7 @@ cargo run --release --example <name>
 | `led_bars` | Demonstrates left/right LED bar functions: symmetric gradients, independent colors, and a scrolling dot |
 | `leds` | Cycles a rainbow animation across all 10 WS2812 LEDs |
 | `microphone` | Reads audio samples from the I2S microphone and logs peak amplitude (Except it's broken somehow, pull requests welcome)) |
-| `nametag` | Displays a name scaled to fill the screen. Configurable via compile-time env vars: `NAME` (required), `BG`/`FG` (hex color or `BG="rainbow"`), `LEDS` (optional, `"heartbeat"` or `"rainbow"`) |
+| `nametag` | Displays a name scaled to fill the screen. Configurable via compile-time env vars: `NAME` (required), `BG`/`FG` (hex color or `BG="rainbow"`, BG="retrofuture" or BG="hearts"), `LEDS` (optional, `"heartbeat"` or `"rainbow"`) |
 | `vertical_scroll` | Hardware vertical scrolling demo using display driver ST7789 with VSCRDEF/VSCRSADD commands to smoothly scroll colored stripes without redrawing |
 | `vibration` | Pulses the vibration motor in a heartbeat pattern |
 
