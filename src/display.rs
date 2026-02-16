@@ -65,7 +65,7 @@ impl<'a> From<DisplayResources<'a>> for Display<'a> {
         let cs = Output::new(res.cs, Level::High, OutputConfig::default());
         let spi_device = ExclusiveDevice::new(spi, cs, delay).unwrap();
 
-        let buffer = mk_static!([u8; 512], [0_u8; 512]);
+        let buffer = mk_static!([u8; 32000], [0_u8; 32000]);
         let di = mipidsi::interface::SpiInterface::new(spi_device, dc, buffer);
 
         mipidsi::Builder::new(mipidsi::models::ST7789, di)
